@@ -13,6 +13,8 @@ export interface Recipe {
   ingredients: Ingredient[];
   steps: string[];
   dietaryTags: string[];
+  imageDescription: string;
+  stepVisualDescriptions: string[];
 }
 
 export interface AnalysisResult {

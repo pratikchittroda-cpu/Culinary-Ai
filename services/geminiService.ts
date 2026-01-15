@@ -14,8 +14,9 @@ export const analyzeFridgeAndGetRecipes = async (
   const prompt = `
     Analyze this image of a fridge/pantry. 
     1. Identify the visible ingredients.
-    2. Suggest 4-5 creative and distinct recipes that can be made primarily with these ingredients (assume basic pantry staples like oil, salt, pepper, flour are available).
+    2. Suggest 4-5 creative and distinct recipes that can be made primarily with these ingredients.
     3. ${filterString}
+    4. For each recipe, provide a 'imageDescription' (a vivid visual description of the final plated dish) and 'stepVisualDescriptions' (an array of visual descriptions for exactly what is happening in each step, matching the number of steps).
     
     Return the result in JSON format.
   `;
@@ -74,9 +75,18 @@ export const analyzeFridgeAndGetRecipes = async (
                   dietaryTags: {
                     type: Type.ARRAY,
                     items: { type: Type.STRING }
+                  },
+                  imageDescription: {
+                    type: Type.STRING,
+                    description: "A highly detailed, appetizing visual description of the final dish for image generation."
+                  },
+                  stepVisualDescriptions: {
+                    type: Type.ARRAY,
+                    items: { type: Type.STRING },
+                    description: "A visual description of the action or state for each step (e.g., 'onions sautéing in a pan until golden'). Must have the same number of items as steps."
                   }
                 },
-                required: ["id", "title", "prepTime", "calories", "difficulty", "ingredients", "steps"]
+                required: ["id", "title", "prepTime", "calories", "difficulty", "ingredients", "steps", "imageDescription", "stepVisualDescriptions"]
               }
             }
           },
@@ -92,5 +102,35 @@ export const analyzeFridgeAndGetRecipes = async (
   } catch (error) {
     console.error("Gemini Analysis Error:", error);
     throw error;
+  }
+};
+
+export const generateImage = async (prompt: string): Promise<string | null> => {
+  try {
+    const response = await ai.models.generateContent({
+      model: 'gemini-2.5-flash-image',
+      contents: {
+        parts: [
+          { text: prompt }
+        ]
+      },
+      config: {
+        imageConfig: {
+          aspectRatio: "16:9",
+        }
+      }
+    });
+
+    if (response.candidates?.[0]?.content?.parts) {
+      for (const part of response.candidates[0].content.parts) {
+        if (part.inlineData && part.inlineData.data) {
+          return `data:${part.inlineData.mimeType};base64,${part.inlineData.data}`;
+        }
+      }
+    }
+    return null;
+  } catch (error) {
+    console.error("Image Generation Error:", error);
+    return null;
   }
 };

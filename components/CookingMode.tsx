@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Recipe } from '../types';
 import { PlayIcon, PauseIcon } from './Icons';
+import { GeneratedImage } from './GeneratedImage';
 
 interface CookingModeProps {
   recipe: Recipe;
@@ -59,10 +60,15 @@ export const CookingMode: React.FC<CookingModeProps> = ({ recipe, onClose, onAdd
 
   const isIngredientInList = (name: string) => shoppingList.some(item => item === name);
 
+  // Fallback if stepVisualDescriptions is missing or mismatch
+  const currentImagePrompt = recipe.stepVisualDescriptions?.[currentStep] 
+    ? `Photorealistic cooking step: ${recipe.stepVisualDescriptions[currentStep]}`
+    : `Photorealistic cooking step: ${recipe.steps[currentStep]}`;
+
   return (
     <div className="fixed inset-0 z-50 bg-slate-900 flex flex-col">
       {/* Header */}
-      <div className="p-4 border-b border-slate-700 flex justify-between items-center bg-slate-800">
+      <div className="p-4 border-b border-slate-700 flex justify-between items-center bg-slate-800 shrink-0">
         <h2 className="text-lg font-bold truncate pr-4 text-white">{recipe.title}</h2>
         <button 
           onClick={onClose}
@@ -74,9 +80,9 @@ export const CookingMode: React.FC<CookingModeProps> = ({ recipe, onClose, onAdd
         </button>
       </div>
 
-      <div className="flex-1 overflow-y-auto flex flex-col md:flex-row">
-        {/* Ingredients Sidebar (Collapsible on mobile maybe, but kept visible for now) */}
-        <div className="w-full md:w-1/4 bg-slate-800/50 p-6 border-r border-slate-700">
+      <div className="flex-1 overflow-hidden flex flex-col md:flex-row">
+        {/* Ingredients Sidebar (Hidden on mobile by default usually, but we keep simpler logic here) */}
+        <div className="hidden md:block md:w-64 lg:w-80 bg-slate-800/50 p-6 border-r border-slate-700 overflow-y-auto">
           <h3 className="text-slate-400 font-semibold mb-4 uppercase text-sm tracking-wider">Ingredients</h3>
           <ul className="space-y-3">
             {recipe.ingredients.map((ing, idx) => (
@@ -107,33 +113,46 @@ export const CookingMode: React.FC<CookingModeProps> = ({ recipe, onClose, onAdd
           </ul>
         </div>
 
-        {/* Step Content */}
-        <div className="flex-1 p-6 md:p-12 flex flex-col justify-center items-center">
-            <div className="w-full max-w-3xl">
-                <div className="mb-8 flex justify-between items-center">
-                    <span className="text-blue-400 font-mono text-xl">Step {currentStep + 1} of {recipe.steps.length}</span>
-                    <button 
-                        onClick={toggleSpeech}
-                        className={`flex items-center gap-2 px-6 py-3 rounded-full font-semibold transition-all ${
-                            isSpeaking 
-                            ? 'bg-red-500/20 text-red-400 hover:bg-red-500/30' 
-                            : 'bg-blue-500 text-white hover:bg-blue-600'
-                        }`}
-                    >
-                        {isSpeaking ? (
-                            <>
-                                <PauseIcon className="w-6 h-6" /> Stop
-                            </>
-                        ) : (
-                            <>
-                                <PlayIcon className="w-6 h-6" /> Read Aloud
-                            </>
-                        )}
-                    </button>
-                </div>
-                
-                <div className="min-h-[200px] flex items-center">
-                    <p className="text-3xl md:text-5xl font-medium leading-tight text-white animate-fade-in">
+        {/* Main Cooking Area - Split View */}
+        <div className="flex-1 flex flex-col h-full overflow-hidden">
+            {/* Image Area - Top 40% on mobile, Left 50% on Desktop ideally, but let's stack for simplicity in this flex col */}
+            <div className="h-1/3 md:h-1/2 w-full bg-black relative shrink-0">
+                 <GeneratedImage 
+                    key={currentStep} // Force re-mount on step change to trigger new generation
+                    prompt={currentImagePrompt}
+                    alt={`Step ${currentStep + 1}`}
+                    className="w-full h-full object-contain"
+                 />
+                 <div className="absolute top-4 left-4 bg-black/50 backdrop-blur px-3 py-1 rounded-full text-white font-mono border border-white/10">
+                    Step {currentStep + 1} / {recipe.steps.length}
+                 </div>
+            </div>
+
+            {/* Instruction Area */}
+            <div className="flex-1 p-6 md:p-10 flex flex-col items-center bg-slate-900 overflow-y-auto">
+                <div className="w-full max-w-3xl">
+                     <div className="flex justify-end mb-4">
+                        <button 
+                            onClick={toggleSpeech}
+                            className={`flex items-center gap-2 px-4 py-2 rounded-full font-semibold text-sm transition-all ${
+                                isSpeaking 
+                                ? 'bg-red-500/20 text-red-400 hover:bg-red-500/30' 
+                                : 'bg-slate-700 text-slate-300 hover:bg-slate-600'
+                            }`}
+                        >
+                            {isSpeaking ? (
+                                <>
+                                    <PauseIcon className="w-4 h-4" /> Stop Audio
+                                </>
+                            ) : (
+                                <>
+                                    <PlayIcon className="w-4 h-4" /> Read Step
+                                </>
+                            )}
+                        </button>
+                     </div>
+
+                    <p className="text-xl md:text-3xl font-medium leading-relaxed text-white animate-fade-in text-center">
                         {recipe.steps[currentStep]}
                     </p>
                 </div>
@@ -142,11 +161,11 @@ export const CookingMode: React.FC<CookingModeProps> = ({ recipe, onClose, onAdd
       </div>
 
       {/* Footer / Controls */}
-      <div className="p-6 bg-slate-800 border-t border-slate-700 flex justify-between items-center">
+      <div className="p-4 md:p-6 bg-slate-800 border-t border-slate-700 flex justify-between items-center shrink-0">
         <button 
           onClick={handlePrev}
           disabled={currentStep === 0}
-          className={`px-8 py-4 rounded-xl font-bold text-lg flex items-center gap-2 ${
+          className={`px-4 py-3 md:px-8 md:py-4 rounded-xl font-bold text-base md:text-lg flex items-center gap-2 ${
             currentStep === 0 
             ? 'bg-slate-700 text-slate-500 cursor-not-allowed' 
             : 'bg-slate-700 text-white hover:bg-slate-600'
@@ -155,15 +174,15 @@ export const CookingMode: React.FC<CookingModeProps> = ({ recipe, onClose, onAdd
           <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor" className="w-5 h-5">
             <path strokeLinecap="round" strokeLinejoin="round" d="M10.5 19.5L3 12m0 0l7.5-7.5M3 12h18" />
           </svg>
-          Previous
+          <span className="hidden md:inline">Previous</span>
         </button>
 
-        <div className="flex gap-2">
+        <div className="flex gap-1.5 md:gap-2 mx-4 overflow-x-auto max-w-[50%]">
             {recipe.steps.map((_, idx) => (
                 <div 
                     key={idx} 
-                    className={`h-2 rounded-full transition-all duration-300 ${
-                        idx === currentStep ? 'w-8 bg-blue-500' : 'w-2 bg-slate-600'
+                    className={`h-2 rounded-full transition-all duration-300 shrink-0 ${
+                        idx === currentStep ? 'w-6 md:w-8 bg-blue-500' : 'w-2 bg-slate-600'
                     }`} 
                 />
             ))}
@@ -172,7 +191,7 @@ export const CookingMode: React.FC<CookingModeProps> = ({ recipe, onClose, onAdd
         {currentStep === recipe.steps.length - 1 ? (
              <button 
              onClick={onClose}
-             className="px-8 py-4 rounded-xl font-bold text-lg bg-green-600 text-white hover:bg-green-700 flex items-center gap-2"
+             className="px-4 py-3 md:px-8 md:py-4 rounded-xl font-bold text-base md:text-lg bg-green-600 text-white hover:bg-green-700 flex items-center gap-2"
            >
              Finish
              <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor" className="w-5 h-5">
@@ -182,9 +201,9 @@ export const CookingMode: React.FC<CookingModeProps> = ({ recipe, onClose, onAdd
         ) : (
             <button 
             onClick={handleNext}
-            className="px-8 py-4 rounded-xl font-bold text-lg bg-blue-600 text-white hover:bg-blue-700 flex items-center gap-2"
+            className="px-4 py-3 md:px-8 md:py-4 rounded-xl font-bold text-base md:text-lg bg-blue-600 text-white hover:bg-blue-700 flex items-center gap-2"
           >
-            Next
+            <span className="hidden md:inline">Next</span>
             <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor" className="w-5 h-5">
               <path strokeLinecap="round" strokeLinejoin="round" d="M13.5 4.5L21 12m0 0l-7.5 7.5M21 12H3" />
             </svg>
